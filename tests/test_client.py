@@ -40,7 +40,7 @@ async def test_create_tip_tx_payload():
         assert body == {
             "platform": "youtube",
             "platform_uid": "UCX6OQ3DkcsbYNE6H8uQQuVA",
-            "donor_wallet": "DonorWallet11111111111111111111111111111111",
+            "donor_wallet": "DonorW22222222222222222222222222222222",
             "token_symbol": "SOL",
             "amount": 0.5,
             "message": "Keep it up!",
@@ -60,7 +60,7 @@ async def test_create_tip_tx_payload():
     res = await client.create_tip_tx(
         platform="youtube",
         platform_uid="UCX6OQ3DkcsbYNE6H8uQQuVA",
-        donor_wallet="DonorWallet11111111111111111111111111111111",
+        donor_wallet="DonorW22222222222222222222222222222222",
         token_symbol="SOL",
         amount=0.5,
         message="Keep it up!",
@@ -80,7 +80,7 @@ async def test_verify_claim_sends_method():
         assert body == {
             "platform": "youtube",
             "platform_uid": "UCX6OQ3DkcsbYNE6H8uQQuVA",
-            "payout_wallet": "PayoutWallet111111111111111111111111111111",
+            "payout_wallet": "PayoutW22222222222222222222222222222222",
             "auth_token": "secret_oauth_token",
             "method": "oauth",
         }
@@ -98,7 +98,7 @@ async def test_verify_claim_sends_method():
     res = await client.verify_creator_claim(
         platform="youtube",
         platform_uid="UCX6OQ3DkcsbYNE6H8uQQuVA",
-        payout_wallet="PayoutWallet111111111111111111111111111111",
+        payout_wallet="PayoutW22222222222222222222222222222222",
         auth_token="secret_oauth_token",
         method="oauth",
     )

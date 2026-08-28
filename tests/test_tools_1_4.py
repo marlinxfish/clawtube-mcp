@@ -94,7 +94,7 @@ async def test_create_tip_tx():
             {
                 "platform": "youtube",
                 "platform_uid": "UC_TEST_UID_123",
-                "donor_wallet": "DonorWallet11111111111111111111111111111111",
+                "donor_wallet": "DonorW22222222222222222222222222222222",
                 "token_symbol": "SOL",
                 "amount": 1.5,
                 "message": "Great video!",

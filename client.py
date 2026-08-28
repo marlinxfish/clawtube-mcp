@@ -1,12 +1,29 @@
-"""Async HTTP client for ClawTube backend REST API."""
+"""Async HTTP client for ClawTube backend REST API with security hardening."""
 
 import asyncio
 import os
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 
 DEFAULT_BASE_URL = os.getenv("CLAWTUBE_API_URL", "http://localhost:8080")
+
+
+def _validate_base_url(url: str) -> str:
+    """Validate backend base URL to prevent SSRF and unsafe schemes."""
+    if not url or not isinstance(url, str):
+        raise ValueError("ClawTube API base URL must be a non-empty string.")
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(
+            f"Invalid base URL scheme '{parsed.scheme}'. Only 'http' and 'https' are allowed."
+        )
+    if not parsed.netloc and not parsed.hostname:
+        raise ValueError(
+            f"Invalid base URL '{url}': Missing hostname / network location."
+        )
+    return url
 
 
 class ClawTubeApiError(Exception):
@@ -23,7 +40,7 @@ class ClawTubeApiError(Exception):
 
 
 class ClawTubeClient:
-    """Async REST client for ClawTube backend daemon with retry logic."""
+    """Async REST client for ClawTube backend daemon with retry logic and SSRF protection."""
 
     def __init__(
         self,
@@ -32,9 +49,10 @@ class ClawTubeClient:
         transport: httpx.AsyncBaseTransport | None = None,
         backoff_factor: float = 0.1,
     ) -> None:
-        url = base_url or os.getenv("CLAWTUBE_API_URL", DEFAULT_BASE_URL)
+        raw_url = base_url or os.getenv("CLAWTUBE_API_URL", DEFAULT_BASE_URL)
+        validated_url = _validate_base_url(raw_url)
         self._http = httpx.AsyncClient(
-            base_url=url, timeout=timeout, transport=transport
+            base_url=validated_url, timeout=timeout, transport=transport
         )
         self._backoff_factor = backoff_factor
 
@@ -59,11 +77,21 @@ class ClawTubeClient:
                     raise self._parse_error_response(resp)
 
                 return resp.json()
-            except httpx.TransportError as exc:
+            except httpx.TimeoutException:
+                last_error = ClawTubeApiError(
+                    code="TIMEOUT",
+                    status=504,
+                    message="Request to ClawTube backend timed out. Please retry later.",
+                )
+                if attempt < max_attempts - 1:
+                    await asyncio.sleep(self._backoff_factor * (2**attempt))
+                    continue
+                raise last_error
+            except httpx.TransportError:
                 last_error = ClawTubeApiError(
                     code="NETWORK_ERROR",
                     status=500,
-                    message=f"Network error communicating with ClawTube backend: {exc}",
+                    message="ClawTube backend is currently unreachable. Please check network connectivity and backend service status.",
                 )
                 if attempt < max_attempts - 1:
                     await asyncio.sleep(self._backoff_factor * (2**attempt))

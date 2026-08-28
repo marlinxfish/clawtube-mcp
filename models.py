@@ -1,16 +1,32 @@
-"""Data models for ClawTube MCP Gateway."""
+"""Data models for ClawTube MCP Gateway with strict security validation."""
 
-from typing import Literal
+import math
+import re
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 Platform = Literal["youtube", "x", "instagram", "threads", "tiktok", "facebook"]
+
+SOLANA_BASE58_PATTERN = r"^[1-9A-HJ-NP-Za-km-z]{32,44}$"
+MAX_AMOUNT_LIMIT = 100_000_000_000.0
+
+
+class SecurityBaseModel(BaseModel):
+    """Base model enforcing null-byte rejection and basic string hygiene."""
+
+    @field_validator("*", mode="before")
+    @classmethod
+    def sanitize_strings(cls, v: Any) -> Any:
+        if isinstance(v, str) and "\x00" in v:
+            raise ValueError("Null-byte injection detected: null characters ('\\0') are prohibited.")
+        return v
 
 
 # --- Input Models ---
 
 
-class ResolveInput(BaseModel):
+class ResolveInput(SecurityBaseModel):
     """Input parameters for resolving a creator identity."""
 
     platform: Platform = Field(
@@ -18,24 +34,36 @@ class ResolveInput(BaseModel):
         description="Target social platform (e.g. youtube, x, instagram)",
     )
     input: str = Field(
-        description="Creator identifier, handle (e.g. @MrBeast), or profile/channel URL",
+        min_length=1,
+        max_length=128,
+        description="Creator identifier, handle (e.g. @MrBeast), or profile/channel URL (1-128 chars)",
     )
 
 
-class EstimateTipInput(BaseModel):
+class EstimateTipInput(SecurityBaseModel):
     """Input parameters for estimating token amount from USD value."""
 
     amount_usd: float = Field(
         gt=0,
-        description="Tip amount in USD (must be > 0)",
+        le=MAX_AMOUNT_LIMIT,
+        description="Tip amount in USD (must be > 0 and <= 100,000,000,000)",
     )
     token_symbol: str = Field(
         default="SOL",
+        min_length=1,
+        max_length=32,
         description="Target token symbol (e.g. SOL, $CLAWTUBE, $CLAW, $ANSEMHACK)",
     )
 
+    @field_validator("amount_usd")
+    @classmethod
+    def validate_finite_amount_usd(cls, v: float) -> float:
+        if not math.isfinite(v):
+            raise ValueError("amount_usd must be a finite positive number")
+        return v
 
-class CreateTipTxInput(BaseModel):
+
+class CreateTipTxInput(SecurityBaseModel):
     """Input parameters for building a Solana Pay tip transaction."""
 
     platform: Platform = Field(
@@ -43,38 +71,55 @@ class CreateTipTxInput(BaseModel):
         description="Target social platform",
     )
     platform_uid: str = Field(
-        description="Immutable platform UID of creator (from resolve_creator)",
+        min_length=1,
+        max_length=64,
+        description="Immutable platform UID of creator (from resolve_creator, 1-64 chars)",
     )
     donor_wallet: str = Field(
-        description="Donor's Solana wallet public key (Base58)",
+        pattern=SOLANA_BASE58_PATTERN,
+        description="Donor's Solana wallet public key (32-44 character Base58 string)",
     )
     token_symbol: str = Field(
         default="SOL",
+        min_length=1,
+        max_length=32,
         description="Token symbol to tip (default: SOL, supports $CLAWTUBE, $CLAW, $ANSEMHACK)",
     )
     amount: float = Field(
         gt=0,
-        description="Token amount to tip (must be > 0)",
+        le=MAX_AMOUNT_LIMIT,
+        description="Token amount to tip (must be > 0 and <= 100,000,000,000)",
     )
     message: str = Field(
         default="",
-        description="Optional memo or message attached to the tip",
+        max_length=280,
+        description="Optional memo or message attached to the tip (max 280 chars)",
     )
     donor_name: str = Field(
         default="",
-        description="Optional donor display name",
+        max_length=64,
+        description="Optional donor display name (max 64 chars)",
     )
 
+    @field_validator("amount")
+    @classmethod
+    def validate_finite_amount(cls, v: float) -> float:
+        if not math.isfinite(v):
+            raise ValueError("amount must be a finite positive number")
+        return v
 
-class TipStatusInput(BaseModel):
+
+class TipStatusInput(SecurityBaseModel):
     """Input parameters for verifying tip confirmation status."""
 
     reference_id_or_signature: str = Field(
-        description="Solana transaction signature or tip reference ID",
+        min_length=1,
+        max_length=128,
+        description="Solana transaction signature or tip reference ID (1-128 chars)",
     )
 
 
-class EscrowBalanceInput(BaseModel):
+class EscrowBalanceInput(SecurityBaseModel):
     """Input parameters for querying creator escrow PDA balances."""
 
     platform: Platform = Field(
@@ -82,11 +127,13 @@ class EscrowBalanceInput(BaseModel):
         description="Target social platform",
     )
     platform_uid: str = Field(
-        description="Immutable platform UID of creator",
+        min_length=1,
+        max_length=64,
+        description="Immutable platform UID of creator (1-64 chars)",
     )
 
 
-class VerifyClaimInput(BaseModel):
+class VerifyClaimInput(SecurityBaseModel):
     """Input parameters for verifying creator claim and assembling dual-signature tx."""
 
     platform: Platform = Field(
@@ -94,29 +141,38 @@ class VerifyClaimInput(BaseModel):
         description="Target social platform",
     )
     platform_uid: str = Field(
-        description="Immutable platform UID of creator",
+        min_length=1,
+        max_length=64,
+        description="Immutable platform UID of creator (1-64 chars)",
     )
     payout_wallet: str = Field(
-        description="Creator's Solana wallet public key for receiving payout",
+        pattern=SOLANA_BASE58_PATTERN,
+        description="Creator's Solana wallet public key for receiving payout (32-44 character Base58)",
     )
     auth_token: str = Field(
-        description="Verification credential (OAuth access token or bio verification code)",
+        min_length=1,
+        max_length=512,
+        description="Verification credential (OAuth access token or bio verification code, 1-512 chars)",
     )
     method: str = Field(
         default="upload",
+        min_length=1,
+        max_length=32,
         description="Verification method: 'upload', 'oauth', or 'bio'",
     )
 
 
-class RefundInput(BaseModel):
+class RefundInput(SecurityBaseModel):
     """Input parameters for refunding an expired donor tip (days 91-120)."""
 
     original_tip_reference: str = Field(
-        description="Original tip reference ID or escrow entry PDA",
+        min_length=1,
+        max_length=128,
+        description="Original tip reference ID or escrow entry PDA (1-128 chars)",
     )
 
 
-class SweepInput(BaseModel):
+class SweepInput(SecurityBaseModel):
     """Input parameters for sweeping expired escrow (>120 days) to treasury."""
 
     platform: Platform = Field(
@@ -125,7 +181,8 @@ class SweepInput(BaseModel):
     )
     platform_uid: str = Field(
         default="",
-        description="Optional creator platform UID (empty to sweep across platform)",
+        max_length=64,
+        description="Optional creator platform UID (empty to sweep across platform, max 64 chars)",
     )
     dry_run: bool = Field(
         default=True,
@@ -133,14 +190,22 @@ class SweepInput(BaseModel):
     )
     sweeper_wallet: str = Field(
         default="",
-        description="Solana wallet public key of sweeper claiming bounty",
+        max_length=44,
+        description="Solana wallet public key of sweeper claiming bounty (optional, 32-44 character Base58)",
     )
+
+    @field_validator("sweeper_wallet")
+    @classmethod
+    def validate_sweeper_wallet(cls, v: str) -> str:
+        if v and not re.match(SOLANA_BASE58_PATTERN, v):
+            raise ValueError("sweeper_wallet must be a valid 32-44 character Base58 Solana public key or empty string")
+        return v
 
 
 # --- Output / Result Models ---
 
 
-class CreatorIdentity(BaseModel):
+class CreatorIdentity(SecurityBaseModel):
     """Immutable identity record for a creator across supported platforms."""
 
     platform: Platform
@@ -150,7 +215,7 @@ class CreatorIdentity(BaseModel):
     avatar_url: str = Field(description="URL to channel avatar / thumbnail image")
 
 
-class PriceEstimateResult(BaseModel):
+class PriceEstimateResult(SecurityBaseModel):
     """USD to token conversion estimate."""
 
     amount_usd: float
@@ -160,7 +225,7 @@ class PriceEstimateResult(BaseModel):
     decimals: int
 
 
-class TipTxResult(BaseModel):
+class TipTxResult(SecurityBaseModel):
     """Unsigned wire transaction for donor tip."""
 
     wire_tx_base64: str = Field(description="Base64-encoded unsigned wire transaction for local signing")
@@ -172,7 +237,7 @@ class TipTxResult(BaseModel):
     amount: float
 
 
-class TipStatusResult(BaseModel):
+class TipStatusResult(SecurityBaseModel):
     """On-chain transaction confirmation status."""
 
     signature: str
@@ -181,7 +246,7 @@ class TipStatusResult(BaseModel):
     err: str | None = None
 
 
-class TokenBalance(BaseModel):
+class TokenBalance(SecurityBaseModel):
     """Token balance inside creator escrow."""
 
     token: str
@@ -189,7 +254,7 @@ class TokenBalance(BaseModel):
     claimable: bool = True
 
 
-class EscrowBalanceResult(BaseModel):
+class EscrowBalanceResult(SecurityBaseModel):
     """On-chain escrow balance details."""
 
     platform: Platform
@@ -199,7 +264,7 @@ class EscrowBalanceResult(BaseModel):
     balances: list[TokenBalance] = Field(default_factory=list)
 
 
-class ClaimResult(BaseModel):
+class ClaimResult(SecurityBaseModel):
     """Creator claim transaction payload."""
 
     claim_status: str = Field(description="ready | pending | completed")
@@ -209,7 +274,7 @@ class ClaimResult(BaseModel):
     expires_at: int | None = None
 
 
-class RefundResult(BaseModel):
+class RefundResult(SecurityBaseModel):
     """Donor refund transaction payload."""
 
     wire_tx_base64: str = Field(description="Base64 unsigned wire tx for donor refund")
@@ -218,7 +283,7 @@ class RefundResult(BaseModel):
     refund_amount: float | None = None
 
 
-class SweepResult(BaseModel):
+class SweepResult(SecurityBaseModel):
     """Permissionless sweeper batch payload."""
 
     dry_run: bool

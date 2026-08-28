@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from fastmcp import FastMCP
-from fastmcp.server.providers.skills import SkillsDirectoryProvider
+from fastmcp.server.providers.skills import SkillProvider
 
 from client import ClawTubeApiError, ClawTubeClient
 from models import (
@@ -26,9 +26,10 @@ from models import (
 
 mcp = FastMCP("ClawTube MCP")
 
-# Register skills provider for AI agent operational guidance
-SKILLS_ROOT = Path(__file__).resolve().parent.parent / "clawtube-skills"
-mcp.add_provider(SkillsDirectoryProvider(roots=[SKILLS_ROOT.parent, SKILLS_ROOT]))
+# Register skills provider for AI agent operational guidance with safe resolution
+SKILLS_ROOT = (Path(__file__).resolve().parent.parent / "clawtube-skills").resolve()
+if SKILLS_ROOT.is_dir() and (SKILLS_ROOT / "SKILL.md").exists():
+    mcp.add_provider(SkillProvider(skill_path=SKILLS_ROOT))
 
 _client: ClawTubeClient | None = None
 
@@ -50,7 +51,7 @@ async def resolve_creator(platform: Platform = "youtube", input: str = "") -> di
 
     Args:
         platform: Target social platform (e.g. 'youtube', 'x', 'instagram'). Default is 'youtube'.
-        input: Creator handle (e.g. '@MrBeast'), username, or profile/channel URL.
+        input: Creator handle (e.g. '@MrBeast'), username, or profile/channel URL (max 128 chars).
 
     Returns:
         CreatorIdentity dict with platform, platform_uid, handle, display_name, avatar_url.
@@ -68,7 +69,7 @@ async def estimate_tip_usd(amount_usd: float = 1.0, token_symbol: str = "SOL") -
     """Estimate token quantity required for a target USD donation amount.
 
     Args:
-        amount_usd: Target donation amount in USD (must be > 0).
+        amount_usd: Target donation amount in USD (must be > 0 and <= 100,000,000,000).
         token_symbol: Token symbol to tip (e.g. 'SOL', '$CLAWTUBE', '$CLAW', '$ANSEMHACK'). Default is 'SOL'.
 
     Returns:
@@ -100,12 +101,12 @@ async def create_tip_tx(
 
     Args:
         platform: Target social platform (e.g. 'youtube'). Default is 'youtube'.
-        platform_uid: Immutable creator platform UID (from resolve_creator).
-        donor_wallet: Base58 Solana public key of the donor.
+        platform_uid: Immutable creator platform UID (from resolve_creator, max 64 chars).
+        donor_wallet: Base58 Solana public key of the donor (32-44 characters).
         token_symbol: Token to tip ('SOL', '$CLAWTUBE', '$CLAW', '$ANSEMHACK'). Default is 'SOL'.
-        amount: Token amount to donate (> 0).
-        message: Optional memo or public message attached to the tip.
-        donor_name: Optional display name for the donor.
+        amount: Token amount to donate (> 0 and <= 100,000,000,000).
+        message: Optional memo or public message attached to the tip (max 280 chars).
+        donor_name: Optional display name for the donor (max 64 chars).
 
     Returns:
         Dict with wire_tx_base64, reference_id, and escrow_pda.
@@ -139,7 +140,7 @@ async def verify_tip_status(reference_id_or_signature: str = "") -> dict[str, An
     """Check on-chain confirmation status of a tip transaction.
 
     Args:
-        reference_id_or_signature: Solana transaction signature or tip reference ID.
+        reference_id_or_signature: Solana transaction signature or tip reference ID (max 128 chars).
 
     Returns:
         Dict with status ('finalized' | 'pending') and signature.
@@ -162,7 +163,7 @@ async def get_creator_escrow_balance(
 
     Args:
         platform: Target social platform. Default is 'youtube'.
-        platform_uid: Immutable creator platform UID.
+        platform_uid: Immutable creator platform UID (max 64 chars).
 
     Returns:
         Dict with identity and list of balances per token.
@@ -189,9 +190,9 @@ async def verify_creator_claim(
 
     Args:
         platform: Target social platform. Default is 'youtube'.
-        platform_uid: Immutable creator platform UID.
-        payout_wallet: Solana wallet public key where creator receives escrowed funds.
-        auth_token: Verification credential (OAuth access token or verification code).
+        platform_uid: Immutable creator platform UID (max 64 chars).
+        payout_wallet: Solana wallet public key where creator receives escrowed funds (32-44 characters Base58).
+        auth_token: Verification credential (OAuth access token or verification code, max 512 chars).
         method: Verification method ('upload', 'oauth', or 'bio'). Default is 'upload'.
 
     Returns:
@@ -222,7 +223,7 @@ async def refund_expired_tip(original_tip_reference: str = "") -> dict[str, Any]
     """Assemble a refund wire transaction for an unclaimed tip in the refund window (days 91-120).
 
     Args:
-        original_tip_reference: Original tip reference ID or escrow entry PDA address.
+        original_tip_reference: Original tip reference ID or escrow entry PDA address (max 128 chars).
 
     Returns:
         Dict with wire_tx_base64 for donor refund.
@@ -250,9 +251,9 @@ async def sweep_expired_escrow(
 
     Args:
         platform: Target social platform. Default is 'youtube'.
-        platform_uid: Optional creator platform UID (leave empty for platform-wide sweep).
+        platform_uid: Optional creator platform UID (leave empty for platform-wide sweep, max 64 chars).
         dry_run: If True, simulates sweep without committing (default: True).
-        sweeper_wallet: Solana wallet public key of sweeper claiming the bounty reward.
+        sweeper_wallet: Solana wallet public key of sweeper claiming the bounty reward (optional, 32-44 chars Base58).
 
     Returns:
         Dict with wire_tx_base64 and swept_entries_count.

@@ -124,14 +124,14 @@ def test_amount_must_be_positive():
         CreateTipTxInput(
             platform="youtube",
             platform_uid="UC_ABC",
-            donor_wallet="Donor111",
+            donor_wallet="DonorW22222222222222222222222222222222",
             amount=0,
         )
 
     valid_tx = CreateTipTxInput(
         platform="youtube",
         platform_uid="UC_ABC",
-        donor_wallet="Donor111",
+        donor_wallet="DonorW22222222222222222222222222222222",
         amount=1.5,
     )
     assert valid_tx.amount == 1.5
