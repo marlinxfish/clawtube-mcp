@@ -31,7 +31,7 @@ class EstimateTipInput(BaseModel):
     )
     token_symbol: str = Field(
         default="SOL",
-        description="Target token symbol (e.g. SOL, TDROP, CLAW)",
+        description="Target token symbol (e.g. SOL, $CLAWTUBE, $CLAW, $ANSEMHACK)",
     )
 
 
@@ -50,7 +50,7 @@ class CreateTipTxInput(BaseModel):
     )
     token_symbol: str = Field(
         default="SOL",
-        description="Token symbol to tip (default: SOL)",
+        description="Token symbol to tip (default: SOL, supports $CLAWTUBE, $CLAW, $ANSEMHACK)",
     )
     amount: float = Field(
         gt=0,
