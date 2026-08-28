@@ -1,0 +1,19 @@
+[project]
+name = "clawtube-mcp"
+version = "0.1.0"
+description = "ClawTube Protocol MCP Gateway — 8 typed tools untuk AI Agent (FastMCP)"
+requires-python = ">=3.12"
+dependencies = [
+    "fastmcp==3.4.7",
+    "httpx>=0.28",
+    "pydantic>=2.11",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.26",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
