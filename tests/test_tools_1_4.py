@@ -18,6 +18,11 @@ def mock_clawtube_backend(monkeypatch):
                     404,
                     json={"code": "NOT_FOUND", "message": "Creator handle @error not found"},
                 )
+            if body.get("input") == "@ratelimit":
+                return httpx.Response(
+                    429,
+                    json={"code": "RATE_LIMITED", "message": "Rate limit exceeded: Maximum 20 creator lookups per minute."},
+                )
             return httpx.Response(
                 200,
                 json={
@@ -125,4 +130,15 @@ async def test_api_error_maps_to_runtimeerror():
             )
         err_msg = str(exc_info.value)
         assert "NOT_FOUND" in err_msg or "not found" in err_msg
+
+@pytest.mark.asyncio
+async def test_resolve_creator_rate_limited():
+    async with Client(server.mcp) as client:
+        with pytest.raises(Exception) as exc_info:
+            await client.call_tool(
+                "resolve_creator", {"platform": "youtube", "input": "@ratelimit"}
+            )
+        err_msg = str(exc_info.value)
+        assert "RATE_LIMITED" in err_msg or "429" in err_msg
+        assert "20 creator lookups per minute" in err_msg
         assert "ClawTube API error" in err_msg

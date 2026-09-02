@@ -1,7 +1,7 @@
 [project]
 name = "clawtube-mcp"
 version = "0.1.0"
-description = "ClawTube Protocol MCP Gateway — 8 typed tools untuk AI Agent (FastMCP)"
+description = "ClawTube Protocol MCP Gateway — 8 typed tools for AI Agents (FastMCP)"
 requires-python = ">=3.12"
 dependencies = [
     "fastmcp==3.4.7",

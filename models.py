@@ -52,7 +52,7 @@ class EstimateTipInput(SecurityBaseModel):
         default="SOL",
         min_length=1,
         max_length=32,
-        description="Target token symbol (e.g. SOL, $CLAWTUBE, $CLAW, $ANSEMHACK)",
+        description="Target token symbol (e.g. SOL, $CLAWTUBE, $CLAW)",
     )
 
     @field_validator("amount_usd")
@@ -83,7 +83,7 @@ class CreateTipTxInput(SecurityBaseModel):
         default="SOL",
         min_length=1,
         max_length=32,
-        description="Token symbol to tip (default: SOL, supports $CLAWTUBE, $CLAW, $ANSEMHACK)",
+        description="Token symbol to tip (default: SOL, supports $CLAWTUBE, $CLAW)",
     )
     amount: float = Field(
         gt=0,

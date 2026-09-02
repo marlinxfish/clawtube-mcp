@@ -70,7 +70,7 @@ async def estimate_tip_usd(amount_usd: float = 1.0, token_symbol: str = "SOL") -
 
     Args:
         amount_usd: Target donation amount in USD (must be > 0 and <= 100,000,000,000).
-        token_symbol: Token symbol to tip (e.g. 'SOL', '$CLAWTUBE', '$CLAW', '$ANSEMHACK'). Default is 'SOL'.
+        token_symbol: Token symbol to tip (e.g. 'SOL', '$CLAWTUBE', '$CLAW'). Default is 'SOL'.
 
     Returns:
         Price estimate dict with token_amount, price_usd, and symbol info.
@@ -103,7 +103,7 @@ async def create_tip_tx(
         platform: Target social platform (e.g. 'youtube'). Default is 'youtube'.
         platform_uid: Immutable creator platform UID (from resolve_creator, max 64 chars).
         donor_wallet: Base58 Solana public key of the donor (32-44 characters).
-        token_symbol: Token to tip ('SOL', '$CLAWTUBE', '$CLAW', '$ANSEMHACK'). Default is 'SOL'.
+        token_symbol: Token to tip ('SOL', '$CLAWTUBE', '$CLAW'). Default is 'SOL'.
         amount: Token amount to donate (> 0 and <= 100,000,000,000).
         message: Optional memo or public message attached to the tip (max 280 chars).
         donor_name: Optional display name for the donor (max 64 chars).

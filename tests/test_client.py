@@ -245,6 +245,25 @@ async def test_api_error_raised():
     assert "Handle format is invalid" in err.message
     await client.aclose()
 
+@pytest.mark.asyncio
+async def test_rate_limited_429_raised():
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            429,
+            json={"code": "RATE_LIMITED", "message": "Rate limit exceeded: Maximum 20 creator lookups per minute."},
+        )
+
+    transport = httpx.MockTransport(handler)
+    client = ClawTubeClient(base_url="http://testserver", transport=transport)
+    with pytest.raises(ClawTubeApiError) as exc_info:
+        await client.resolve_creator("youtube", "@spam")
+
+    err = exc_info.value
+    assert err.status == 429
+    assert err.code == "RATE_LIMITED"
+    assert "20 creator lookups per minute" in err.message
+    await client.aclose()
+
 
 @pytest.mark.asyncio
 async def test_retry_on_5xx():
