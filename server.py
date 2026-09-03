@@ -184,7 +184,7 @@ async def verify_creator_claim(
     platform_uid: str = "",
     payout_wallet: str = "",
     auth_token: str = "",
-    method: str = "upload",
+    method: str = "oauth",
 ) -> dict[str, Any]:
     """Validate creator channel ownership and assemble dual-signature claim wire transaction.
 
@@ -193,7 +193,7 @@ async def verify_creator_claim(
         platform_uid: Immutable creator platform UID (max 64 chars).
         payout_wallet: Solana wallet public key where creator receives escrowed funds (32-44 characters Base58).
         auth_token: Verification credential (OAuth access token or verification code, max 512 chars).
-        method: Verification method ('upload', 'oauth', or 'bio'). Default is 'upload'.
+        method: Verification method ('oauth' or 'bio_code'). Default is 'oauth'.
 
     Returns:
         Dict with claim_status, wire_tx_base64 (requiring Oracle + Creator signatures), attestation.

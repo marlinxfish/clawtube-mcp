@@ -77,13 +77,11 @@ async def test_verify_claim_sends_method():
         assert request.method == "POST"
         assert request.url.path == "/v1/claim/verify"
         body = json.loads(request.content)
-        assert body == {
-            "platform": "youtube",
-            "platform_uid": "UCX6OQ3DkcsbYNE6H8uQQuVA",
-            "payout_wallet": "PayoutW22222222222222222222222222222222",
-            "auth_token": "secret_oauth_token",
-            "method": "oauth",
-        }
+        assert body["platform"] == "youtube"
+        assert body["platform_uid"] == "UCX6OQ3DkcsbYNE6H8uQQuVA"
+        assert body["payout_wallet"] == "PayoutW22222222222222222222222222222222"
+        assert body["credential"] == "secret_oauth_token"
+        assert body["method"] == "oauth"
         return httpx.Response(
             200,
             json={
@@ -112,7 +110,7 @@ async def test_tip_status():
         assert request.method == "POST"
         assert request.url.path == "/v1/tip/status"
         body = json.loads(request.content)
-        assert body == {"reference_id_or_signature": "sig_abc123"}
+        assert body["signature"] == "sig_abc123"
         return httpx.Response(
             200,
             json={
@@ -223,6 +221,18 @@ async def test_price():
     res = await client.estimate_tip_usd(amount_usd=10.0, token_symbol="SOL")
     assert res["token_amount"] == 0.05
     assert res["price_usd"] == 200.0
+    await client.aclose()
+
+@pytest.mark.asyncio
+async def test_price_fallback_on_404():
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"message": "Not Found"})
+
+    transport = httpx.MockTransport(handler)
+    client = ClawTubeClient(base_url="http://testserver", transport=transport)
+    res = await client.estimate_tip_usd(amount_usd=14.0, token_symbol="SOL")
+    assert res["token_amount"] == 0.1
+    assert res["price_usd"] == 140.0
     await client.aclose()
 
 

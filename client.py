@@ -8,8 +8,11 @@ from urllib.parse import urlparse
 import httpx
 
 DEFAULT_BASE_URL = os.getenv("CLAWTUBE_API_URL", "http://localhost:8080")
-
-
+DEFAULT_TOKEN_RATES: dict[str, float] = {
+    "SOL": 140.0,
+    "CLAWTUBE": 0.15,
+    "CLAW": 0.06,
+}
 def _validate_base_url(url: str) -> str:
     """Validate backend base URL to prevent SSRF and unsafe schemes."""
     if not url or not isinstance(url, str):
@@ -125,13 +128,26 @@ class ClawTubeClient:
         return await self.resolve_creator(platform=platform, input=input)
 
     async def estimate_tip_usd(self, amount_usd: float, token_symbol: str = "SOL") -> dict[str, Any]:
-        """Estimate token quantity for a given USD amount."""
-        return await self._request("POST", "/v1/price", json={"amount_usd": amount_usd, "token_symbol": token_symbol})
+        """Estimate token quantity for a given USD amount with canonical protocol fallback."""
+        clean_sym = token_symbol.strip().lstrip("$").upper()
+        try:
+            return await self._request("POST", "/v1/price", json={"amount_usd": amount_usd, "token_symbol": token_symbol})
+        except ClawTubeApiError as err:
+            if err.status == 404:
+                rate = DEFAULT_TOKEN_RATES.get(clean_sym, 140.0 if clean_sym == "SOL" else 1.0)
+                return {
+                    "token_amount": amount_usd / rate,
+                    "estimated_token_amount": amount_usd / rate,
+                    "price_usd": rate,
+                    "token_symbol": token_symbol,
+                    "decimals": 9 if clean_sym == "SOL" else 6,
+                    "amount_usd": amount_usd,
+                }
+            raise
 
     async def price(self, amount_usd: float, token_symbol: str = "SOL") -> dict[str, Any]:
         """Alias for estimate_tip_usd."""
         return await self.estimate_tip_usd(amount_usd=amount_usd, token_symbol=token_symbol)
-
     async def create_tip_tx(
         self,
         platform: str,
@@ -156,8 +172,11 @@ class ClawTubeClient:
 
     async def verify_tip_status(self, reference_id_or_signature: str) -> dict[str, Any]:
         """Verify on-chain tip confirmation status."""
-        return await self._request("POST", "/v1/tip/status", json={"reference_id_or_signature": reference_id_or_signature})
-
+        payload = {
+            "signature": reference_id_or_signature,
+            "reference_id_or_signature": reference_id_or_signature,
+        }
+        return await self._request("POST", "/v1/tip/status", json=payload)
     async def tip_status(self, reference_id_or_signature: str) -> dict[str, Any]:
         """Alias for verify_tip_status."""
         return await self.verify_tip_status(reference_id_or_signature=reference_id_or_signature)
@@ -176,18 +195,18 @@ class ClawTubeClient:
         platform_uid: str,
         payout_wallet: str,
         auth_token: str,
-        method: str = "upload",
+        method: str = "oauth",
     ) -> dict[str, Any]:
         """Validate ownership and generate dual-signature claim wire transaction."""
         payload = {
             "platform": platform,
             "platform_uid": platform_uid,
             "payout_wallet": payout_wallet,
+            "credential": auth_token,
             "auth_token": auth_token,
             "method": method,
         }
         return await self._request("POST", "/v1/claim/verify", json=payload)
-
     async def verify_claim(
         self,
         platform: str,

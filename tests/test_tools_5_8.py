@@ -24,7 +24,7 @@ def mock_clawtube_backend(monkeypatch):
                     },
                     "balances": [
                         {"token": "SOL", "amount": "2.5", "claimable": True},
-                        {"token": "TDROP", "amount": "1000", "claimable": True},
+                        {"token": "CLAWTUBE", "amount": "1000", "claimable": True},
                     ],
                 },
             )

@@ -155,12 +155,11 @@ class VerifyClaimInput(SecurityBaseModel):
         description="Verification credential (OAuth access token or bio verification code, 1-512 chars)",
     )
     method: str = Field(
-        default="upload",
+        default="oauth",
         min_length=1,
         max_length=32,
-        description="Verification method: 'upload', 'oauth', or 'bio'",
+        description="Verification method: 'oauth' (Google/YouTube) or 'bio_code'",
     )
-
 
 class RefundInput(SecurityBaseModel):
     """Input parameters for refunding an expired donor tip (days 91-120)."""
