@@ -2,7 +2,7 @@
 
 8 typed tools for AI Agents to interact with ClawTube Protocol on Solana.
 Provides creator identity resolution, tip transaction assembly, on-chain confirmation,
-escrow queries, dual-signature creator claims, expired tip refunds, and sweeper bounties.
+escrow queries, dual-signature creator claims, and expired tip refunds.
 """
 
 from pathlib import Path
@@ -19,7 +19,6 @@ from models import (
     Platform,
     RefundInput,
     ResolveInput,
-    SweepInput,
     TipStatusInput,
     VerifyClaimInput,
 )
@@ -233,44 +232,6 @@ async def refund_expired_tip(original_tip_reference: str = "") -> dict[str, Any]
     try:
         return await client.refund_expired_tip(
             original_tip_reference=params.original_tip_reference
-        )
-    except ClawTubeApiError as e:
-        raise RuntimeError(f"ClawTube API error ({e.code or e.status}): {e.message}") from e
-
-
-@mcp.tool
-async def sweep_expired_escrow(
-    platform: Platform = "youtube",
-    platform_uid: str = "",
-    dry_run: bool = True,
-    sweeper_wallet: str = "",
-) -> dict[str, Any]:
-    """Assemble a batch sweep transaction to sweep expired donations (>120 days) to treasury.
-
-    Supports dry-run mode for discovering eligible entries before broadcasting.
-
-    Args:
-        platform: Target social platform. Default is 'youtube'.
-        platform_uid: Optional creator platform UID (leave empty for platform-wide sweep, max 64 chars).
-        dry_run: If True, simulates sweep without committing (default: True).
-        sweeper_wallet: Solana wallet public key of sweeper claiming the bounty reward (optional, 32-44 chars Base58).
-
-    Returns:
-        Dict with wire_tx_base64 and swept_entries_count.
-    """
-    params = SweepInput(
-        platform=platform,
-        platform_uid=platform_uid,
-        dry_run=dry_run,
-        sweeper_wallet=sweeper_wallet,
-    )
-    client = get_client()
-    try:
-        return await client.sweep_expired_escrow(
-            platform=params.platform,
-            platform_uid=params.platform_uid,
-            dry_run=params.dry_run,
-            sweeper_wallet=params.sweeper_wallet,
         )
     except ClawTubeApiError as e:
         raise RuntimeError(f"ClawTube API error ({e.code or e.status}): {e.message}") from e

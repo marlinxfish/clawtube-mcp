@@ -171,36 +171,6 @@ class RefundInput(SecurityBaseModel):
     )
 
 
-class SweepInput(SecurityBaseModel):
-    """Input parameters for sweeping expired escrow (>120 days) to treasury."""
-
-    platform: Platform = Field(
-        default="youtube",
-        description="Target social platform",
-    )
-    platform_uid: str = Field(
-        default="",
-        max_length=64,
-        description="Optional creator platform UID (empty to sweep across platform, max 64 chars)",
-    )
-    dry_run: bool = Field(
-        default=True,
-        description="Whether to simulate sweep without generating broadcastable tx (default: True)",
-    )
-    sweeper_wallet: str = Field(
-        default="",
-        max_length=44,
-        description="Solana wallet public key of sweeper claiming bounty (optional, 32-44 character Base58)",
-    )
-
-    @field_validator("sweeper_wallet")
-    @classmethod
-    def validate_sweeper_wallet(cls, v: str) -> str:
-        if v and not re.match(SOLANA_BASE58_PATTERN, v):
-            raise ValueError("sweeper_wallet must be a valid 32-44 character Base58 Solana public key or empty string")
-        return v
-
-
 # --- Output / Result Models ---
 
 
@@ -282,9 +252,3 @@ class RefundResult(SecurityBaseModel):
     refund_amount: float | None = None
 
 
-class SweepResult(SecurityBaseModel):
-    """Permissionless sweeper batch payload."""
-
-    dry_run: bool
-    eligible_entries_count: int
-    wire_transactions_base64: list[str] = Field(default_factory=list)

@@ -29,7 +29,6 @@ from models import (
     EstimateTipInput,
     RefundInput,
     ResolveInput,
-    SweepInput,
     TipStatusInput,
     VerifyClaimInput,
 )
@@ -104,20 +103,6 @@ def test_payout_wallet_rejects_invalid(wallet: str):
             auth_token="valid_token",
         )
 
-
-def test_sweeper_wallet_optional_and_validation():
-    # Empty sweeper wallet is valid (optional)
-    sweep_empty = SweepInput(sweeper_wallet="")
-    assert sweep_empty.sweeper_wallet == ""
-
-    # Valid Base58 sweeper wallet is valid
-    sweep_valid = SweepInput(sweeper_wallet=VALID_SOLANA_WALLETS[0])
-    assert sweep_valid.sweeper_wallet == VALID_SOLANA_WALLETS[0]
-
-    # Invalid Base58 sweeper wallet is rejected
-    for invalid_wallet in INVALID_WALLETS:
-        with pytest.raises(ValidationError):
-            SweepInput(sweeper_wallet=invalid_wallet)
 
 
 # =============================================================================
@@ -425,7 +410,6 @@ def test_no_private_keys_in_models():
         EscrowBalanceInput,
         VerifyClaimInput,
         RefundInput,
-        SweepInput,
     ]
 
     for model in models:

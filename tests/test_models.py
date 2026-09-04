@@ -20,8 +20,6 @@ from models import (
     RefundInput,
     RefundResult,
     ResolveInput,
-    SweepInput,
-    SweepResult,
     TipStatusInput,
     TipStatusResult,
     TipTxResult,
@@ -139,13 +137,6 @@ def test_amount_must_be_positive():
     assert valid_tx.message == ""
     assert valid_tx.donor_name == ""
 
-
-def test_sweep_dry_run_default_true():
-    sweep = SweepInput()
-    assert sweep.dry_run is True
-    assert sweep.platform == "youtube"
-    assert sweep.platform_uid == ""
-    assert sweep.sweeper_wallet == ""
 
 
 def test_required_fields():

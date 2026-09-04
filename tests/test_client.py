@@ -175,33 +175,6 @@ async def test_refund_tx():
     await client.aclose()
 
 
-@pytest.mark.asyncio
-async def test_sweep_tx():
-    async def handler(request: httpx.Request) -> httpx.Response:
-        assert request.method == "POST"
-        assert request.url.path == "/v1/sweep/tx"
-        body = json.loads(request.content)
-        assert body == {
-            "platform": "youtube",
-            "platform_uid": "UCX6OQ3DkcsbYNE6H8uQQuVA",
-            "dry_run": True,
-            "sweeper_wallet": "Sweeper1111111111111111111111111111111111",
-        }
-        return httpx.Response(
-            200,
-            json={"wire_tx_base64": "AQAAAA==", "swept_entries_count": 3},
-        )
-
-    transport = httpx.MockTransport(handler)
-    client = ClawTubeClient(base_url="http://testserver", transport=transport)
-    res = await client.sweep_expired_escrow(
-        platform="youtube",
-        platform_uid="UCX6OQ3DkcsbYNE6H8uQQuVA",
-        dry_run=True,
-        sweeper_wallet="Sweeper1111111111111111111111111111111111",
-    )
-    assert res["swept_entries_count"] == 3
-    await client.aclose()
 
 
 @pytest.mark.asyncio

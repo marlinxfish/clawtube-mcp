@@ -231,38 +231,6 @@ class ClawTubeClient:
     async def refund_tx(self, original_tip_reference: str) -> dict[str, Any]:
         """Alias for refund_expired_tip."""
         return await self.refund_expired_tip(original_tip_reference=original_tip_reference)
-
-    async def sweep_expired_escrow(
-        self,
-        platform: str = "youtube",
-        platform_uid: str = "",
-        dry_run: bool = True,
-        sweeper_wallet: str = "",
-    ) -> dict[str, Any]:
-        """Generate sweep wire transaction for expired escrow (>120 days)."""
-        payload = {
-            "platform": platform,
-            "platform_uid": platform_uid,
-            "dry_run": dry_run,
-            "sweeper_wallet": sweeper_wallet,
-        }
-        return await self._request("POST", "/v1/sweep/tx", json=payload)
-
-    async def sweep_tx(
-        self,
-        platform: str = "youtube",
-        platform_uid: str = "",
-        dry_run: bool = True,
-        sweeper_wallet: str = "",
-    ) -> dict[str, Any]:
-        """Alias for sweep_expired_escrow."""
-        return await self.sweep_expired_escrow(
-            platform=platform,
-            platform_uid=platform_uid,
-            dry_run=dry_run,
-            sweeper_wallet=sweeper_wallet,
-        )
-
     async def aclose(self) -> None:
         """Close the underlying HTTP client."""
         await self._http.aclose()

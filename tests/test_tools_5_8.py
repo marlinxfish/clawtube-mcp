@@ -49,14 +49,6 @@ def mock_clawtube_backend(monkeypatch):
                 200,
                 json={"wire_tx_base64": "AQAAAA=="},
             )
-        elif path == "/v1/sweep/tx":
-            body = json.loads(request.content)
-            assert body.get("dry_run") is True
-            return httpx.Response(
-                200,
-                json={"wire_tx_base64": "AQAAAA==", "swept_entries_count": 5},
-            )
-        return httpx.Response(404, json={"message": "Not Found"})
 
     transport = httpx.MockTransport(handler)
     mock_client = ClawTubeClient(base_url="http://testbackend", transport=transport)
@@ -105,22 +97,6 @@ async def test_refund_expired_tip():
 
 
 @pytest.mark.asyncio
-async def test_sweep_expired_escrow():
-    async with Client(server.mcp) as client:
-        res = await client.call_tool(
-            "sweep_expired_escrow",
-            {
-                "platform": "youtube",
-                "platform_uid": "",
-                "dry_run": True,
-                "sweeper_wallet": "Sweeper1111111111111111111111111111111111",
-            },
-        )
-        assert res.data["swept_entries_count"] == 5
-        assert res.data["wire_tx_base64"] == "AQAAAA=="
-
-
-@pytest.mark.asyncio
 async def test_error_mapping():
     async with Client(server.mcp) as client:
         with pytest.raises(Exception) as exc_info:
@@ -134,10 +110,10 @@ async def test_error_mapping():
 
 
 @pytest.mark.asyncio
-async def test_list_tools_returns_8():
+async def test_list_tools_returns_7():
     async with Client(server.mcp) as client:
         tools = await client.list_tools()
-        assert len(tools) == 8
+        assert len(tools) == 7
         names = {t.name for t in tools}
         expected_names = {
             "resolve_creator",
@@ -147,6 +123,5 @@ async def test_list_tools_returns_8():
             "get_creator_escrow_balance",
             "verify_creator_claim",
             "refund_expired_tip",
-            "sweep_expired_escrow",
         }
         assert names == expected_names

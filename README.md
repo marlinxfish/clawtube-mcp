@@ -14,9 +14,8 @@ uv run fastmcp run server.py --transport sse --port 8081  # remote/cloud
 uv run --group dev pytest -v                      # test suite
 ```
 
-## 8 Tools
-`resolve_creator` · `estimate_tip_usd` · `create_tip_tx` · `verify_tip_status` · `get_creator_escrow_balance` · `verify_creator_claim` · `refund_expired_tip` · `sweep_expired_escrow`
-
+## 7 Tools
+`resolve_creator` · `estimate_tip_usd` · `create_tip_tx` · `verify_tip_status` · `get_creator_escrow_balance` · `verify_creator_claim` · `refund_expired_tip`
 ## Client Configuration
 ```json
 {
