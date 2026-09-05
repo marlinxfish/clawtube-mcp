@@ -3,8 +3,7 @@
 import asyncio
 import os
 from typing import Any
-from urllib.parse import urlparse
-
+from urllib.parse import quote, urlparse
 import httpx
 
 DEFAULT_BASE_URL = os.getenv("CLAWTUBE_API_URL", "http://localhost:8080")
@@ -17,16 +16,17 @@ def _validate_base_url(url: str) -> str:
     """Validate backend base URL to prevent SSRF and unsafe schemes."""
     if not url or not isinstance(url, str):
         raise ValueError("ClawTube API base URL must be a non-empty string.")
-    parsed = urlparse(url)
+    clean_url = url.strip()
+    parsed = urlparse(clean_url)
     if parsed.scheme not in ("http", "https"):
         raise ValueError(
             f"Invalid base URL scheme '{parsed.scheme}'. Only 'http' and 'https' are allowed."
         )
     if not parsed.netloc and not parsed.hostname:
         raise ValueError(
-            f"Invalid base URL '{url}': Missing hostname / network location."
+            f"Invalid base URL '{clean_url}': Missing hostname / network location."
         )
-    return url
+    return clean_url
 
 
 class ClawTubeApiError(Exception):
@@ -54,8 +54,9 @@ class ClawTubeClient:
     ) -> None:
         raw_url = base_url or os.getenv("CLAWTUBE_API_URL", DEFAULT_BASE_URL)
         validated_url = _validate_base_url(raw_url)
+        limits = httpx.Limits(max_connections=50, max_keepalive_connections=10, keepalive_expiry=10.0)
         self._http = httpx.AsyncClient(
-            base_url=validated_url, timeout=timeout, transport=transport
+            base_url=validated_url, timeout=timeout, transport=transport, limits=limits
         )
         self._backoff_factor = backoff_factor
 
@@ -183,8 +184,9 @@ class ClawTubeClient:
 
     async def get_creator_escrow_balance(self, platform: str, platform_uid: str) -> dict[str, Any]:
         """Get creator on-chain escrow PDA balances."""
-        return await self._request("GET", f"/v1/escrow/{platform}/{platform_uid}")
-
+        safe_platform = quote(str(platform).strip(), safe="")
+        safe_uid = quote(str(platform_uid).strip(), safe="")
+        return await self._request("GET", f"/v1/escrow/{safe_platform}/{safe_uid}")
     async def escrow_balance(self, platform: str, platform_uid: str) -> dict[str, Any]:
         """Alias for get_creator_escrow_balance."""
         return await self.get_creator_escrow_balance(platform=platform, platform_uid=platform_uid)

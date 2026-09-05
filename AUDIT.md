@@ -1,18 +1,16 @@
 # ClawTube MCP Gateway Security Audit & Hardening Report
 
 **Target**: `clawtube-mcp` (FastMCP Gateway v3.4.7)  
-**Date**: 2026-08-29  
+**Date**: 2026-09-05  
 **Role**: Senior Security Auditor & MCP Hardening Engineer  
-**Status**: 100% Remediated & Verified (110/110 Tests Passing)
+**Status**: 100% Remediated & Verified (112/112 Tests Passing)
 
 ---
 
 ## 1. Executive Summary
 
 A comprehensive security audit of the ClawTube FastMCP gateway (`clawtube-mcp`) was conducted across all 8 protocol tools, Pydantic domain models, async HTTP backend clients, and skill provider integrations. All identified vulnerabilities were hardened using Test-Driven Development (TDD) with regression and edge-case tests in `tests/test_security.py`.
-
-The test suite expanded from **34 baseline tests to 110 tests**, achieving complete coverage of all input boundaries, wallet validations, SSRF protections, and error sanitization paths.
-
+The test suite expanded to **112 tests**, achieving complete coverage of all input boundaries, wallet validations, SSRF protections, control character rejections, token whitelists, URL path sanitizations, and error sanitization paths.
 ---
 
 ## 2. Threat Model & Audit Checklist
@@ -87,6 +85,36 @@ The test suite expanded from **34 baseline tests to 110 tests**, achieving compl
   - Added explicit directory existence and `SKILL.md` verification before provider attachment.
   - Verified that skill resource URIs only expose `skill://clawtube-skills/` and cannot traverse into other repository components.
 
+
+### Finding 8: Control Character Injection Defense
+- **Vulnerability**: While null bytes (`\0`) were rejected, other ASCII control characters (`\x01-\x1f`, `\x7f`, ANSI terminal escapes, CRLF) were allowed in string fields.
+- **Remediation**:
+  - Updated `SecurityBaseModel` to reject all control characters (`re.compile(r"[\x00-\x1f\x7f]")`).
+  - Completely blocks CRLF injection, ANSI terminal escapes, and downstream string parsing bugs.
+
+### Finding 9: Backend Invariant Alignment on Message & Donor Name
+- **Vulnerability**: `CreateTipTxInput` allowed up to 280 characters for `message` and 64 for `donor_name`, but `clawtube-backend` strictly enforces maximum 128 characters for `message` and 32 for `donor_name`.
+- **Remediation**:
+  - Aligned `CreateTipTxInput.message` to `max_length=128`.
+  - Aligned `CreateTipTxInput.donor_name` to `max_length=32`.
+  - Fails early at MCP validation layer before making unnecessary network calls to backend.
+
+### Finding 10: Strict Whitelist for Token Symbols
+- **Vulnerability**: `token_symbol` accepted arbitrary strings up to 32 characters, allowing malicious or invalid symbols to reach price estimation and transaction building endpoints.
+- **Remediation**:
+  - Added strict whitelist validator `validate_safe_token_symbol` enforcing supported tokens: `{"SOL", "$SOL", "CLAWTUBE", "$CLAWTUBE", "CLAW", "$CLAW"}`.
+  - Rejects unknown tokens, SQL injection, script tags, and malformed strings.
+
+### Finding 11: Path Traversal & URL Injection in Escrow Lookups
+- **Vulnerability**: `platform_uid` was interpolated directly into the HTTP path `/v1/escrow/{platform}/{platform_uid}` without URL escaping, allowing path traversal (`../`) or route manipulation.
+- **Remediation**:
+  - Added `validate_safe_platform_uid` enforcing that `platform_uid` cannot contain path traversal characters (`/`, `\`, `..`, `%`).
+  - Wrapped parameters in `urllib.parse.quote(..., safe="")` in `client.py` for defense-in-depth.
+
+### Finding 12: Connection Pooling & Socket Exhaustion Defense
+- **Vulnerability**: HTTP client did not configure explicit connection limits, risking socket descriptor exhaustion under high-concurrency or SSE mode.
+- **Remediation**:
+  - Configured explicit connection limits `httpx.Limits(max_connections=50, max_keepalive_connections=10, keepalive_expiry=10.0)` in `ClawTubeClient`.
 ---
 
 ## 4. Test Suite & Verification Results
@@ -112,8 +140,7 @@ tests/test_skills.py .                                                   [ 90%]
 tests/test_tools_1_4.py .....                                            [ 94%]
 tests/test_tools_5_8.py ......                                           [100%]
 
-============================= 110 passed in 2.04s ==============================
-```
+============================= 112 passed in 2.20s ==============================
 
 ### Breakdown of Test Suites
 - `tests/test_security.py` (76 tests): Complete coverage of wallet validation, boundary tests, numeric constraints, SSRF protection, null-byte rejection, error sanitization, zero private key checks, and skills isolation.

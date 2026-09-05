@@ -143,36 +143,36 @@ def test_platform_uid_boundaries():
 
 
 def test_message_and_donor_name_boundaries():
-    # Message max 280 chars
+    # Message max 128 chars, donor_name max 32 chars (matching backend invariants)
     valid_tx = CreateTipTxInput(
         platform="youtube",
         platform_uid="UC_VALID",
         donor_wallet=VALID_SOLANA_WALLETS[0],
         amount=1.0,
-        message="m" * 280,
-        donor_name="d" * 64,
+        message="m" * 128,
+        donor_name="d" * 32,
     )
-    assert len(valid_tx.message) == 280
-    assert len(valid_tx.donor_name) == 64
+    assert len(valid_tx.message) == 128
+    assert len(valid_tx.donor_name) == 32
 
-    # Message > 280 rejected
+    # Message > 128 rejected
     with pytest.raises(ValidationError):
         CreateTipTxInput(
             platform="youtube",
             platform_uid="UC_VALID",
             donor_wallet=VALID_SOLANA_WALLETS[0],
             amount=1.0,
-            message="m" * 281,
+            message="m" * 129,
         )
 
-    # Donor name > 64 rejected
+    # Donor name > 32 rejected
     with pytest.raises(ValidationError):
         CreateTipTxInput(
             platform="youtube",
             platform_uid="UC_VALID",
             donor_wallet=VALID_SOLANA_WALLETS[0],
             amount=1.0,
-            donor_name="d" * 65,
+            donor_name="d" * 33,
         )
 
     # Null byte in message rejected
@@ -185,6 +185,24 @@ def test_message_and_donor_name_boundaries():
             message="hello\x00world",
         )
 
+    # ASCII control characters in message or donor_name rejected
+    for ctrl in ["\r", "\n", "\x1b", "\x7f", "\x07", "\x08"]:
+        with pytest.raises(ValidationError):
+            CreateTipTxInput(
+                platform="youtube",
+                platform_uid="UC_VALID",
+                donor_wallet=VALID_SOLANA_WALLETS[0],
+                amount=1.0,
+                message=f"hello{ctrl}world",
+            )
+        with pytest.raises(ValidationError):
+            CreateTipTxInput(
+                platform="youtube",
+                platform_uid="UC_VALID",
+                donor_wallet=VALID_SOLANA_WALLETS[0],
+                amount=1.0,
+                donor_name=f"Alice{ctrl}",
+            )
 
 def test_reference_id_boundaries():
     # Valid reference <= 128 chars
@@ -505,3 +523,76 @@ async def test_skills_provider_no_parent_directory_leak():
             assert not uri_str.startswith("file:///")
             assert "clawtube-program" not in uri_str
             assert "clawtube-mcp" not in uri_str
+
+def test_platform_uid_path_traversal_rejection():
+    """Verify platform_uid rejects path traversal and URL injection sequences."""
+    malicious_uids = [
+        "../admin",
+        "..\\admin",
+        "/etc/passwd",
+        "UC_123/messages",
+        "UC_123%2fadmin",
+        "  ",
+    ]
+    for bad_uid in malicious_uids:
+        with pytest.raises(ValidationError):
+            EscrowBalanceInput(platform="youtube", platform_uid=bad_uid)
+        with pytest.raises(ValidationError):
+            CreateTipTxInput(
+                platform="youtube",
+                platform_uid=bad_uid,
+                donor_wallet=VALID_SOLANA_WALLETS[0],
+                amount=1.0,
+            )
+        with pytest.raises(ValidationError):
+            VerifyClaimInput(
+                platform="youtube",
+                platform_uid=bad_uid,
+                payout_wallet=VALID_SOLANA_WALLETS[0],
+                auth_token="token",
+            )
+
+
+def test_token_symbol_whitelist():
+    """Verify token_symbol enforces strict whitelist ($CLAWTUBE, $CLAW, SOL)."""
+    valid_tokens = ["SOL", "$SOL", "CLAWTUBE", "$CLAWTUBE", "CLAW", "$CLAW"]
+    for token in valid_tokens:
+        est = EstimateTipInput(amount_usd=10.0, token_symbol=token)
+        assert est.token_symbol == token
+        tx = CreateTipTxInput(
+            platform="youtube",
+            platform_uid="UC_VALID",
+            donor_wallet=VALID_SOLANA_WALLETS[0],
+            token_symbol=token,
+            amount=1.0,
+        )
+        assert tx.token_symbol == token
+
+    invalid_tokens = ["USDC", "ETH", "BTC", "DROP TABLE", "<script>", "SOL; rm -rf"]
+    for token in invalid_tokens:
+        with pytest.raises(ValidationError):
+            EstimateTipInput(amount_usd=10.0, token_symbol=token)
+        with pytest.raises(ValidationError):
+            CreateTipTxInput(
+                platform="youtube",
+                platform_uid="UC_VALID",
+                donor_wallet=VALID_SOLANA_WALLETS[0],
+                token_symbol=token,
+                amount=1.0,
+            )
+
+
+@pytest.mark.asyncio
+async def test_escrow_url_path_encoding():
+    """Verify client properly encodes platform and platform_uid in URL path."""
+    captured_path = ""
+
+    async def mock_handler(request: httpx.Request) -> httpx.Response:
+        nonlocal captured_path
+        captured_path = request.url.raw_path.decode("utf-8")
+        return httpx.Response(200, json={"platform": "youtube", "platform_uid": "test", "balances": []})
+    transport = httpx.MockTransport(mock_handler)
+    client = ClawTubeClient(base_url="http://testbackend", transport=transport)
+    await client.get_creator_escrow_balance("youtube", "UC TEST 123")
+    assert captured_path == "/v1/escrow/youtube/UC%20TEST%20123"
+    await client.aclose()

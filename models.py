@@ -7,22 +7,46 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, field_validator
 
 Platform = Literal["youtube", "x", "instagram", "threads", "tiktok", "facebook"]
-
 SOLANA_BASE58_PATTERN = r"^[1-9A-HJ-NP-Za-km-z]{32,44}$"
 MAX_AMOUNT_LIMIT = 100_000_000_000.0
+CONTROL_CHAR_REGEX = re.compile(r"[\x00-\x1f\x7f]")
+SUPPORTED_TOKEN_SYMBOLS = {"SOL", "$SOL", "CLAWTUBE", "$CLAWTUBE", "CLAW", "$CLAW"}
+
+
+def validate_safe_platform_uid(v: str) -> str:
+    """Validate platform UID against path traversal and forbidden characters."""
+    trimmed = v.strip()
+    if not trimmed:
+        raise ValueError("platform_uid cannot be empty or whitespace.")
+    if any(c in trimmed for c in ("/", "\\", "%")) or ".." in trimmed:
+        raise ValueError(
+            "platform_uid cannot contain path traversal characters ('/', '\\', '%', '..')."
+        )
+    return trimmed
+
+
+def validate_safe_token_symbol(v: str) -> str:
+    """Enforce whitelisted Solana tokens."""
+    clean = v.strip().upper()
+    if clean not in SUPPORTED_TOKEN_SYMBOLS:
+        raise ValueError(
+            f"Unsupported token symbol '{v}'. Supported tokens: SOL, $CLAWTUBE, $CLAW"
+        )
+    return v
 
 
 class SecurityBaseModel(BaseModel):
-    """Base model enforcing null-byte rejection and basic string hygiene."""
+    """Base model enforcing null-byte and control-character rejection."""
 
     @field_validator("*", mode="before")
     @classmethod
     def sanitize_strings(cls, v: Any) -> Any:
-        if isinstance(v, str) and "\x00" in v:
-            raise ValueError("Null-byte injection detected: null characters ('\\0') are prohibited.")
+        if isinstance(v, str):
+            if "\x00" in v:
+                raise ValueError("Null-byte injection detected: null characters ('\\0') are prohibited.")
+            if CONTROL_CHAR_REGEX.search(v):
+                raise ValueError("Control character detected: ASCII control characters are prohibited.")
         return v
-
-
 # --- Input Models ---
 
 
@@ -54,6 +78,10 @@ class EstimateTipInput(SecurityBaseModel):
         max_length=32,
         description="Target token symbol (e.g. SOL, $CLAWTUBE, $CLAW)",
     )
+    @field_validator("token_symbol")
+    @classmethod
+    def validate_symbol(cls, v: str) -> str:
+        return validate_safe_token_symbol(v)
 
     @field_validator("amount_usd")
     @classmethod
@@ -92,14 +120,24 @@ class CreateTipTxInput(SecurityBaseModel):
     )
     message: str = Field(
         default="",
-        max_length=280,
-        description="Optional memo or message attached to the tip (max 280 chars)",
+        max_length=128,
+        description="Optional memo or message attached to the tip (max 128 chars)",
     )
     donor_name: str = Field(
         default="",
-        max_length=64,
-        description="Optional donor display name (max 64 chars)",
+        max_length=32,
+        description="Optional donor display name (max 32 chars)",
     )
+
+    @field_validator("platform_uid")
+    @classmethod
+    def validate_uid(cls, v: str) -> str:
+        return validate_safe_platform_uid(v)
+
+    @field_validator("token_symbol")
+    @classmethod
+    def validate_symbol(cls, v: str) -> str:
+        return validate_safe_token_symbol(v)
 
     @field_validator("amount")
     @classmethod
@@ -132,6 +170,11 @@ class EscrowBalanceInput(SecurityBaseModel):
         description="Immutable platform UID of creator (1-64 chars)",
     )
 
+    @field_validator("platform_uid")
+    @classmethod
+    def validate_uid(cls, v: str) -> str:
+        return validate_safe_platform_uid(v)
+
 
 class VerifyClaimInput(SecurityBaseModel):
     """Input parameters for verifying creator claim and assembling dual-signature tx."""
@@ -145,6 +188,11 @@ class VerifyClaimInput(SecurityBaseModel):
         max_length=64,
         description="Immutable platform UID of creator (1-64 chars)",
     )
+
+    @field_validator("platform_uid")
+    @classmethod
+    def validate_uid(cls, v: str) -> str:
+        return validate_safe_platform_uid(v)
     payout_wallet: str = Field(
         pattern=SOLANA_BASE58_PATTERN,
         description="Creator's Solana wallet public key for receiving payout (32-44 character Base58)",
