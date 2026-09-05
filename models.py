@@ -6,8 +6,20 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-Platform = Literal["youtube", "x", "instagram", "threads", "tiktok", "facebook"]
+Platform = Literal["youtube"]
+SUPPORTED_PLATFORMS = {"youtube"}
 SOLANA_BASE58_PATTERN = r"^[1-9A-HJ-NP-Za-km-z]{32,44}$"
+
+def validate_active_platform(v: str) -> str:
+    """Enforce Phase 1 YouTube-only restriction to prevent unclaimable fund lockups."""
+    cleaned = str(v).strip().lower()
+    if cleaned not in SUPPORTED_PLATFORMS:
+        raise ValueError(
+            f"Platform '{v}' is not active in Phase 1. Only 'youtube' is currently supported "
+            "because creator claim verification is only live for YouTube channels. "
+            "Do not route tips to other platforms to prevent permanent fund lockup."
+        )
+    return cleaned
 MAX_AMOUNT_LIMIT = 100_000_000_000.0
 CONTROL_CHAR_REGEX = re.compile(r"[\x00-\x1f\x7f]")
 SUPPORTED_TOKEN_SYMBOLS = {"SOL", "$SOL", "CLAWTUBE", "$CLAWTUBE", "CLAW", "$CLAW"}
@@ -55,13 +67,18 @@ class ResolveInput(SecurityBaseModel):
 
     platform: Platform = Field(
         default="youtube",
-        description="Target social platform (e.g. youtube, x, instagram)",
+        description="Target social platform. Phase 1 ONLY supports 'youtube'.",
     )
     input: str = Field(
         min_length=1,
         max_length=128,
         description="Creator identifier, handle (e.g. @MrBeast), or profile/channel URL (1-128 chars)",
     )
+
+    @field_validator("platform", mode="before")
+    @classmethod
+    def validate_platform(cls, v: str) -> str:
+        return validate_active_platform(v)
 
 
 class EstimateTipInput(SecurityBaseModel):
@@ -78,6 +95,7 @@ class EstimateTipInput(SecurityBaseModel):
         max_length=32,
         description="Target token symbol (e.g. SOL, $CLAWTUBE, $CLAW)",
     )
+
     @field_validator("token_symbol")
     @classmethod
     def validate_symbol(cls, v: str) -> str:
@@ -96,7 +114,7 @@ class CreateTipTxInput(SecurityBaseModel):
 
     platform: Platform = Field(
         default="youtube",
-        description="Target social platform",
+        description="Target social platform. Phase 1 ONLY supports 'youtube'.",
     )
     platform_uid: str = Field(
         min_length=1,
@@ -128,6 +146,11 @@ class CreateTipTxInput(SecurityBaseModel):
         max_length=32,
         description="Optional donor display name (max 32 chars)",
     )
+
+    @field_validator("platform", mode="before")
+    @classmethod
+    def validate_platform(cls, v: str) -> str:
+        return validate_active_platform(v)
 
     @field_validator("platform_uid")
     @classmethod
@@ -162,13 +185,18 @@ class EscrowBalanceInput(SecurityBaseModel):
 
     platform: Platform = Field(
         default="youtube",
-        description="Target social platform",
+        description="Target social platform. Phase 1 ONLY supports 'youtube'.",
     )
     platform_uid: str = Field(
         min_length=1,
         max_length=64,
         description="Immutable platform UID of creator (1-64 chars)",
     )
+
+    @field_validator("platform", mode="before")
+    @classmethod
+    def validate_platform(cls, v: str) -> str:
+        return validate_active_platform(v)
 
     @field_validator("platform_uid")
     @classmethod
@@ -181,18 +209,13 @@ class VerifyClaimInput(SecurityBaseModel):
 
     platform: Platform = Field(
         default="youtube",
-        description="Target social platform",
+        description="Target social platform. Phase 1 ONLY supports 'youtube'.",
     )
     platform_uid: str = Field(
         min_length=1,
         max_length=64,
         description="Immutable platform UID of creator (1-64 chars)",
     )
-
-    @field_validator("platform_uid")
-    @classmethod
-    def validate_uid(cls, v: str) -> str:
-        return validate_safe_platform_uid(v)
     payout_wallet: str = Field(
         pattern=SOLANA_BASE58_PATTERN,
         description="Creator's Solana wallet public key for receiving payout (32-44 character Base58)",
@@ -208,6 +231,17 @@ class VerifyClaimInput(SecurityBaseModel):
         max_length=32,
         description="Verification method: 'oauth' (Google/YouTube) or 'bio_code'",
     )
+
+    @field_validator("platform", mode="before")
+    @classmethod
+    def validate_platform(cls, v: str) -> str:
+        return validate_active_platform(v)
+
+    @field_validator("platform_uid")
+    @classmethod
+    def validate_uid(cls, v: str) -> str:
+        return validate_safe_platform_uid(v)
+
 
 class RefundInput(SecurityBaseModel):
     """Input parameters for refunding an expired donor tip (days 91-120)."""

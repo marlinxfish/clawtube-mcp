@@ -1,6 +1,5 @@
 """ClawTube Protocol MCP Gateway (FastMCP v3.4.7).
-
-8 typed tools for AI Agents to interact with ClawTube Protocol on Solana.
+7 typed tools for AI Agents to interact with ClawTube Protocol on Solana.
 Provides creator identity resolution, tip transaction assembly, on-chain confirmation,
 escrow queries, dual-signature creator claims, and expired tip refunds.
 """
@@ -41,17 +40,15 @@ def get_client() -> ClawTubeClient:
     return _client
 
 
-# --- 8 Protocol Tools ---
-
+# --- 7 Protocol Tools ---
 
 @mcp.tool
 async def resolve_creator(platform: Platform = "youtube", input: str = "") -> dict[str, Any]:
     """Resolve creator handle, username, or channel URL to immutable CreatorIdentity.
 
     Args:
-        platform: Target social platform (e.g. 'youtube', 'x', 'instagram'). Default is 'youtube'.
+        platform: Target platform. Phase 1 ONLY supports 'youtube'. Default is 'youtube'.
         input: Creator handle (e.g. '@MrBeast'), username, or profile/channel URL (max 128 chars).
-
     Returns:
         CreatorIdentity dict with platform, platform_uid, handle, display_name, avatar_url.
     """
@@ -99,14 +96,13 @@ async def create_tip_tx(
     The returned base64 wire transaction must be signed locally by the donor wallet.
 
     Args:
-        platform: Target social platform (e.g. 'youtube'). Default is 'youtube'.
+        platform: Target platform. Phase 1 ONLY supports 'youtube'. Default is 'youtube'.
         platform_uid: Immutable creator platform UID (from resolve_creator, max 64 chars).
         donor_wallet: Base58 Solana public key of the donor (32-44 characters).
         token_symbol: Token to tip ('SOL', '$CLAWTUBE', '$CLAW'). Default is 'SOL'.
         amount: Token amount to donate (> 0 and <= 100,000,000,000).
-        message: Optional memo or public message attached to the tip (max 280 chars).
-        donor_name: Optional display name for the donor (max 64 chars).
-
+        message: Optional memo or public message attached to the tip (max 128 chars).
+        donor_name: Optional display name for the donor (max 32 chars).
     Returns:
         Dict with wire_tx_base64, reference_id, and escrow_pda.
     """
@@ -161,7 +157,7 @@ async def get_creator_escrow_balance(
     """Query on-chain escrow PDA balances and claimable tokens for a creator.
 
     Args:
-        platform: Target social platform. Default is 'youtube'.
+        platform: Target platform. Phase 1 ONLY supports 'youtube'. Default is 'youtube'.
         platform_uid: Immutable creator platform UID (max 64 chars).
 
     Returns:
@@ -188,12 +184,11 @@ async def verify_creator_claim(
     """Validate creator channel ownership and assemble dual-signature claim wire transaction.
 
     Args:
-        platform: Target social platform. Default is 'youtube'.
+        platform: Target platform. Phase 1 ONLY supports 'youtube'. Default is 'youtube'.
         platform_uid: Immutable creator platform UID (max 64 chars).
-        payout_wallet: Solana wallet public key where creator receives escrowed funds (32-44 characters Base58).
+        payout_wallet: Solana wallet public key where creator receives payout (32-44 characters Base58).
         auth_token: Verification credential (OAuth access token or verification code, max 512 chars).
         method: Verification method ('oauth' or 'bio_code'). Default is 'oauth'.
-
     Returns:
         Dict with claim_status, wire_tx_base64 (requiring Oracle + Creator signatures), attestation.
     """

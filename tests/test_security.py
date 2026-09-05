@@ -596,3 +596,34 @@ async def test_escrow_url_path_encoding():
     await client.get_creator_escrow_balance("youtube", "UC TEST 123")
     assert captured_path == "/v1/escrow/youtube/UC%20TEST%20123"
     await client.aclose()
+
+
+def test_non_youtube_platforms_rejected():
+    """Verify non-YouTube platforms (x, instagram, etc.) are strictly rejected in Phase 1."""
+    disabled_platforms = ["x", "instagram", "threads", "tiktok", "facebook", "twitter", "twitch"]
+    for plat in disabled_platforms:
+        with pytest.raises(ValidationError) as exc_info:
+            ResolveInput(platform=plat, input="@creator")
+        assert "not active in phase 1" in str(exc_info.value).lower()
+
+        with pytest.raises(ValidationError) as exc_info:
+            CreateTipTxInput(
+                platform=plat,
+                platform_uid="UC_VALID",
+                donor_wallet=VALID_SOLANA_WALLETS[0],
+                amount=1.0,
+            )
+        assert "not active in phase 1" in str(exc_info.value).lower()
+
+        with pytest.raises(ValidationError) as exc_info:
+            EscrowBalanceInput(platform=plat, platform_uid="UC_VALID")
+        assert "not active in phase 1" in str(exc_info.value).lower()
+
+        with pytest.raises(ValidationError) as exc_info:
+            VerifyClaimInput(
+                platform=plat,
+                platform_uid="UC_VALID",
+                payout_wallet=VALID_SOLANA_WALLETS[0],
+                auth_token="token",
+            )
+        assert "not active in phase 1" in str(exc_info.value).lower()
