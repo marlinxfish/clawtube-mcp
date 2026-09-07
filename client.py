@@ -233,6 +233,15 @@ class ClawTubeClient:
     async def refund_tx(self, original_tip_reference: str) -> dict[str, Any]:
         """Alias for refund_expired_tip."""
         return await self.refund_expired_tip(original_tip_reference=original_tip_reference)
+
+    async def claim_faucet(self, address: str) -> dict[str, Any]:
+        """Request Devnet faucet test tokens ($CLAWTUBE and $CLAW) for a wallet."""
+        return await self._request("POST", "/v1/faucet/request", json={"address": address})
+
+    async def get_faucet_status(self, address: str = "") -> dict[str, Any]:
+        """Check Devnet faucet claim status and rate limit eligibility."""
+        path = f"/v1/faucet/status?address={quote(address)}" if address else "/v1/faucet/status"
+        return await self._request("GET", path)
     async def aclose(self) -> None:
         """Close the underlying HTTP client."""
         await self._http.aclose()

@@ -7,10 +7,10 @@ import server
 
 
 @pytest.mark.asyncio
-async def test_server_lists_7_tools():
+async def test_server_lists_8_tools():
     async with Client(server.mcp) as client:
         tools = await client.list_tools()
-        assert len(tools) == 7
+        assert len(tools) == 8
         names = {t.name for t in tools}
         expected_names = {
             "resolve_creator",
@@ -20,5 +20,6 @@ async def test_server_lists_7_tools():
             "get_creator_escrow_balance",
             "verify_creator_claim",
             "refund_expired_tip",
+            "claim_faucet",
         }
         assert names == expected_names

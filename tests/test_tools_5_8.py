@@ -49,7 +49,17 @@ def mock_clawtube_backend(monkeypatch):
                 200,
                 json={"wire_tx_base64": "AQAAAA=="},
             )
-
+        elif path == "/v1/faucet/request":
+            return httpx.Response(
+                200,
+                json={
+                    "success": True,
+                    "signature": "mock_sig_123",
+                    "amount": "1000",
+                    "recipient": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi",
+                    "tokens": ["CLAWTUBE", "CLAW"],
+                },
+            )
     transport = httpx.MockTransport(handler)
     mock_client = ClawTubeClient(base_url="http://testbackend", transport=transport)
     monkeypatch.setattr(server, "get_client", lambda: mock_client)
@@ -97,6 +107,17 @@ async def test_refund_expired_tip():
 
 
 @pytest.mark.asyncio
+async def test_claim_faucet():
+    async with Client(server.mcp) as client:
+        res = await client.call_tool(
+            "claim_faucet",
+            {"address": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi"},
+        )
+        assert res.data["success"] is True
+        assert res.data["signature"] == "mock_sig_123"
+        assert "CLAWTUBE" in res.data["tokens"]
+
+@pytest.mark.asyncio
 async def test_error_mapping():
     async with Client(server.mcp) as client:
         with pytest.raises(Exception) as exc_info:
@@ -113,7 +134,7 @@ async def test_error_mapping():
 async def test_list_tools_returns_7():
     async with Client(server.mcp) as client:
         tools = await client.list_tools()
-        assert len(tools) == 7
+        assert len(tools) == 8
         names = {t.name for t in tools}
         expected_names = {
             "resolve_creator",
@@ -123,5 +144,6 @@ async def test_list_tools_returns_7():
             "get_creator_escrow_balance",
             "verify_creator_claim",
             "refund_expired_tip",
+            "claim_faucet",
         }
         assert names == expected_names

@@ -252,6 +252,25 @@ class RefundInput(SecurityBaseModel):
         description="Original tip reference ID or escrow entry PDA (1-128 chars)",
     )
 
+class FaucetClaimInput(SecurityBaseModel):
+    """Input parameters for requesting Devnet faucet test tokens."""
+
+    address: str = Field(
+        min_length=32,
+        max_length=44,
+        description="Solana Base58 public key of the recipient wallet (32-44 characters)",
+    )
+
+    @field_validator("address")
+    @classmethod
+    def validate_solana_address(cls, v: str) -> str:
+        trimmed = v.strip()
+        if not re.match(SOLANA_BASE58_PATTERN, trimmed):
+            raise ValueError(
+                f"Invalid Solana wallet address '{v}'. Must be a 32-44 character Base58 public key."
+            )
+        return trimmed
+
 
 # --- Output / Result Models ---
 
@@ -332,5 +351,16 @@ class RefundResult(SecurityBaseModel):
     entry_pda: str
     donor_wallet: str | None = None
     refund_amount: float | None = None
+
+
+class FaucetClaimResult(SecurityBaseModel):
+    """Devnet faucet claim response."""
+
+    success: bool
+    signature: str
+    amount: str
+    recipient: str
+    tokens: list[str] = Field(default_factory=list)
+    message: str | None = None
 
 

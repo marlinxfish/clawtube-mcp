@@ -15,6 +15,7 @@ from models import (
     CreateTipTxInput,
     EscrowBalanceInput,
     EstimateTipInput,
+    FaucetClaimInput,
     Platform,
     RefundInput,
     ResolveInput,
@@ -231,6 +232,27 @@ async def refund_expired_tip(original_tip_reference: str = "") -> dict[str, Any]
     except ClawTubeApiError as e:
         raise RuntimeError(f"ClawTube API error ({e.code or e.status}): {e.message}") from e
 
+
+
+@mcp.tool
+async def claim_faucet(address: str = "") -> dict[str, Any]:
+    """Request Devnet faucet test tokens ($CLAWTUBE and $CLAW) for a Solana wallet.
+
+    On Solana Devnet, each address and IP can claim faucet tokens once every 24 hours.
+    Airdrops 1,000 $CLAWTUBE and 1,000 $CLAW test tokens to the recipient wallet.
+
+    Args:
+        address: Solana Base58 public key of the recipient wallet (32-44 characters).
+
+    Returns:
+        Dict with success status, transaction signature, recipient, and airdropped tokens.
+    """
+    params = FaucetClaimInput(address=address)
+    client = get_client()
+    try:
+        return await client.claim_faucet(address=params.address)
+    except ClawTubeApiError as e:
+        raise RuntimeError(f"ClawTube API error ({e.code or e.status}): {e.message}") from e
 
 if __name__ == "__main__":
     mcp.run()
